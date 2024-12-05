@@ -90,6 +90,16 @@ body {
 }
 
 .tiptap {
+  /* Link styles */
+  a {
+    @apply text-blue-600;
+    cursor: pointer;
+
+    &:hover {
+      @apply underline underline-offset-4;
+    }
+  }
+
   /* Image specific styling */
   img {
     display: block;
@@ -119,7 +129,7 @@ body {
       position: relative;
       vertical-align: top;
 
-      >* {
+      > * {
         margin-bottom: 0;
       }
     }
@@ -234,13 +244,13 @@ body {
       align-items: flex-start;
       display: flex;
 
-      >label {
+      > label {
         flex: 0 0 auto;
         margin-right: 0.5rem;
         user-select: none;
       }
 
-      >div {
+      > div {
         flex: 1 1 auto;
       }
     }
@@ -253,6 +263,4 @@ body {
       margin: 0;
     }
   }
-
-
 }
