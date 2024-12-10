@@ -26,6 +26,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
 
 import { useLiveblocksExtension } from "@liveblocks/react-tiptap";
+import { useStorage } from "@liveblocks/react";
 
 import { useEditorStore } from "@/store/use-editor-store";
 import { FontSizeExtensions } from "@/extensions/font-size";
@@ -34,7 +35,10 @@ import { Ruler } from "./ruler";
 import { Threads } from "./threads";
 
 export const Editor = () => {
-  const liveblocks = useLiveblocksExtension()
+  const leftMargin = useStorage((root) => root.leftMargin);
+  const rightMargin = useStorage((root) => root.rightMargin);
+
+  const liveblocks = useLiveblocksExtension();
   const { setEditor } = useEditorStore();
 
   const editor = useEditor({
@@ -65,7 +69,7 @@ export const Editor = () => {
     },
     editorProps: {
       attributes: {
-        style: "padding-left: 56px; padding-right: 56px;",
+        style: `padding-left: ${leftMargin ?? 56}px; padding-right: ${rightMargin ?? 56}px;`,
         class:
           "focus:outline-none print:boder-0 border bg-white border-editor-border flex flex-col min-h-[1054px] w-[816px] pt-10 pr-14 pb-10 cursor-text",
       },
@@ -73,7 +77,7 @@ export const Editor = () => {
     extensions: [
       liveblocks,
       StarterKit.configure({
-        history: false
+        history: false,
       }),
       Table,
       TableCell,
