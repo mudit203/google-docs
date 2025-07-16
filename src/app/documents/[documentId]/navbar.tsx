@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import {toast} from "sonner";
+import { Editor } from "@tiptap/react";
 
 // icons
 import { BsFilePdf } from "react-icons/bs";
@@ -49,7 +51,11 @@ import { Doc } from "../../../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+
+
+interface WordDocumentUploadOptions {
+  editor: Editor; // Explicitly type the editor
+}
 
 interface NavbarProps {
   data: Doc<"documents">;
@@ -80,194 +86,436 @@ const handleWordDocumentUpload = async (editor: any) => {
   // Create a hidden file input
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ".docx,.doc";
+  input.accept = ".docx";
   
   // Handle file selection
   input.onchange = async (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
     
+    if (!file.name.endsWith('.docx')) {
+      toast.error("Please select a .docx file");
+      return;
+    }
+    
     try {
-      // Import mammoth dynamically
-      const mammoth = await import("mammoth");
-      
       // Show loading toast
-      toast.loading("Converting document...");
+      toast.loading("Processing Word document...");
       
-      // Enhanced conversion options with better styling and page break handling
+      // Import required libraries
+      const [{ renderAsync }, JSZip] = await Promise.all([
+        import("docx-preview"),
+        import("jszip")
+      ]);
+      
+      console.log("� Processing file:", file.name, "Size:", file.size);
+      
+      // Create a temporary container for rendering
+      const tempContainer = document.createElement("div");
+      tempContainer.style.position = "absolute";
+      tempContainer.style.left = "-9999px";
+      tempContainer.style.top = "-9999px";
+      tempContainer.style.width = "800px";
+      document.body.appendChild(tempContainer);
+      
+      // Configure docx-preview options
       const options = {
-        convertImage: mammoth.images.imgElement((image: any) => {
-          return image.read("base64").then((imageBuffer: string) => {
-            const imgSrc = `data:${image.contentType};base64,${imageBuffer}`;
-            console.log("📸 Image converted:", {
-              contentType: image.contentType,
-              dataLength: imageBuffer.length,
-              srcPreview: imgSrc.substring(0, 50) + "..."
-            });
-            return {
-              src: imgSrc,
-              alt: "Imported image from Word document",
-              style: "max-width: 100%; height: auto; display: block; margin: 1rem 0",
-              width: "auto",
-              height: "auto"
-            };
-          }).catch((error: Error) => {
-            console.error("❌ Image conversion error:", error);
-            return {
-              src: "",
-              alt: "Failed to convert image"
-            };
-          });
-        }),
-        
-        // Style mapping to preserve Word document formatting
-        styleMap: [
-          // Headings
-          "p[style-name='Heading 1'] => h1",
-          "p[style-name='Heading 2'] => h2", 
-          "p[style-name='Heading 3'] => h3",
-          "p[style-name='Heading 4'] => h4",
-          "p[style-name='Heading 5'] => h5",
-          "p[style-name='Heading 6'] => h6",
-          
-          // Text formatting
-          "r[style-name='Strong'] => strong",
-          "r[style-name='Emphasis'] => em",
-          
-          // Lists
-          "p[style-name='List Paragraph'] => li:fresh",
-          
-          // Tables - preserve table structure
-          "table => table.imported-table",
-          "tr => tr",
-          "td => td",
-          
-          // Page breaks - convert to horizontal rules for visual separation
-          "p[style-name='Page Break'] => hr",
-          
-          // Default paragraph styling
-          "p => p:fresh"
-        ],
-        
-        // Handle page breaks through style mapping instead
-        includeDefaultStyleMap: true
+        className: "docx-preview-container",
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        ignoreFonts: false,
+        breakPages: false,
+        ignoreLastRenderedPageBreak: true,
+        experimental: true,
+        trimXmlDeclaration: true,
+        useBase64URL: true,
+        useMathMLPolyfill: true,
+        showChanges: false,
+        debug: false
       };
       
-      const result = await mammoth.convertToHtml(
-        { arrayBuffer: await file.arrayBuffer() },
-        options
-      );
+      console.log("🔄 Rendering document with docx-preview...");
+      
+      // Render the document
+      await renderAsync(file, tempContainer, undefined, options);
+      
+      console.log("✅ Document rendered successfully");
+      
+      // Get the rendered HTML
+      let renderedHtml = tempContainer.innerHTML;
+      
+      console.log("📝 Rendered HTML length:", renderedHtml.length);
+      console.log("🔍 Raw rendered HTML preview:", renderedHtml.substring(0, 500) + "...");
+      
+      // Process and clean up the HTML
+      renderedHtml = await processDocxHtml(renderedHtml, file);
+      
+      // Clean up temporary container
+      document.body.removeChild(tempContainer);
       
       if (editor) {
+        console.log("🔄 Setting content in editor...");
+        
         // Clear current content
         editor.commands.clearContent();
         
-        // Process the HTML to add page breaks and improve formatting
-        let processedHtml = result.value;
-        
-        console.log("📝 Raw HTML from mammoth:", processedHtml.substring(0, 500) + "...");
-        
-        // Add page break styling
-           processedHtml = processedHtml.replace(
-          /<img([^>]*)>/gi,
-          (match, attrs) => {
-            console.log("🖼️ Found image tag:", match);
-            return `<img${attrs} class="imported-image" style="max-width: 100%; height: auto; display: block; margin: 1rem auto;">`;
-          }
-        );
-        // Ensure images have proper attributes for TipTap
-        processedHtml = processedHtml.replace(
-          /<img([^>]*)>/gi,
-          (match, attrs) => {
-            console.log("🖼️ Found image tag:", match);
-            return `<img${attrs} class="imported-image" style="max-width: 100%; height: auto; display: block; margin: 1rem auto;">`;
-          }
-        );
-        
-        // Improve table styling
-        processedHtml = processedHtml.replace(
-          /<table/gi,
-          '<table style="border-collapse: collapse; width: 100%; margin: 1rem 0; border: 1px solid #ddd;"'
-        );
-        
-        processedHtml = processedHtml.replace(
-          /<td/gi,
-          '<td style="border: 1px solid #ddd; padding: 0.5rem;"'
-        );
-        
-        console.log("✅ Processed HTML preview:", processedHtml.substring(0, 500) + "...");
-        
-        // Set new content from Word document
-        console.log("🔄 Setting content in editor...");
-        
-        try {
-          // Extract images from HTML for separate insertion
-          const images: Array<{src: string, alt: string}> = [];
-          const imageRegex = /<img[^>]+src="([^"]*)"[^>]*alt="([^"]*)"[^>]*>/gi;
-          let match;
+        // Test if images are valid by checking a sample
+        const testImageMatch = renderedHtml.match(/<img[^>]*src="([^"]+)"[^>]*>/);
+        if (testImageMatch) {
+          let testSrc = testImageMatch[1];
           
-          while ((match = imageRegex.exec(processedHtml)) !== null) {
-            images.push({
-              src: match[1],
-              alt: match[2]
-            });
+          // Fix MIME type for testing if needed
+          if (testSrc.startsWith('data:application/octet-stream;base64,')) {
+            const base64Data = testSrc.replace('data:application/octet-stream;base64,', '');
+            let detectedType = 'image/jpeg'; // default
+            
+            if (base64Data.startsWith('/9j/')) {
+              detectedType = 'image/jpeg';
+            } else if (base64Data.startsWith('iVBORw0KGgo')) {
+              detectedType = 'image/png';
+            }
+            
+            testSrc = `data:${detectedType};base64,${base64Data}`;
           }
           
-          console.log("🖼️ Extracted images:", images.length);
+          console.log("🧪 Testing image validity:", testSrc.substring(0, 100) + "...");
           
-          // Remove images from HTML temporarily
-          const htmlWithoutImages = processedHtml.replace(/<img[^>]*>/gi, '<p>[IMAGE_PLACEHOLDER]</p>');
+          // Create a test image to verify it loads
+          const testImg = document.createElement('img');
+          testImg.onload = () => {
+            console.log("✅ Test image loaded successfully");
+          };
+          testImg.onerror = () => {
+            console.log("❌ Test image failed to load");
+          };
+          testImg.src = testSrc;
+        }
+        
+        // Set the processed HTML content
+        editor.commands.setContent(renderedHtml);
+        
+        // Force a re-render to ensure images are processed
+        editor.commands.focus();
+        
+        // Single comprehensive verification after sufficient time
+        setTimeout(() => {
+          const editorContent = editor.getHTML();
+          const domImages = editor.view.dom.querySelectorAll('img');
+          const domTables = editor.view.dom.querySelectorAll('table');
+          const expectedImages = (renderedHtml.match(/<img/g) || []).length;
           
-          // Set content without images first
-          editor.commands.setContent(htmlWithoutImages);
-          console.log("✅ Text content set successfully");
+          console.log("� Final content verification:", {
+            expectedImages: expectedImages,
+            domImages: domImages.length,
+            tables: domTables.length,
+            contentLength: editorContent.length
+          });
           
-          // Insert images one by one
-          if (images.length > 0) {
-            setTimeout(() => {
-              images.forEach((image, index) => {
-                console.log(`📸 Inserting image ${index + 1}:`, image.src.substring(0, 50) + "...");
+          // Check if we have significantly fewer images than expected
+          if (domImages.length < expectedImages && expectedImages > 0) {
+            console.log(`⚠️ Missing images: Expected ${expectedImages}, found ${domImages.length}`);
+            
+            // Try the alternative approach only if we're missing most images
+            if (domImages.length < expectedImages * 0.3) {
+              console.log("🔄 Trying alternative image insertion method...");
+              
+              // Find all image tags in the processed HTML
+              const imageMatches = renderedHtml.match(/<img[^>]*src="([^"]+)"[^>]*>/g);
+              if (imageMatches) {
+                console.log("🖼️ Found", imageMatches.length, "images to insert");
                 
-                // Find placeholder and replace with image
-                const content = editor.getHTML();
-                const updatedContent = content.replace('<p>[IMAGE_PLACEHOLDER]</p>', 
-                  `<img src="${image.src}" alt="${image.alt}" class="imported-image" style="max-width: 100%; height: auto; display: block; margin: 1rem auto;" />`
-                );
-                editor.commands.setContent(updatedContent);
-              });
-              
-              // Final check
-              setTimeout(() => {
-                const editorImages = editor.view.dom.querySelectorAll('img');
-                console.log("🖼️ Final images in editor:", editorImages.length);
-              }, 500);
-              
-            }, 500);
+                // Insert missing images at appropriate positions
+                imageMatches.forEach((imgTag: string, index: number) => {
+                  // Skip if this image is already in the DOM
+                  if (index < domImages.length) {
+                    return;
+                  }
+                  
+                  const srcMatch = imgTag.match(/src="([^"]+)"/);
+                  if (srcMatch && srcMatch[1]) {
+                    let finalSrc = srcMatch[1];
+                    
+                    // Fix MIME type if needed
+                    if (finalSrc.startsWith('data:application/octet-stream;base64,')) {
+                      const base64Data = finalSrc.replace('data:application/octet-stream;base64,', '');
+                      
+                      let detectedType = 'image/jpeg';
+                      if (base64Data.startsWith('/9j/')) {
+                        detectedType = 'image/jpeg';
+                      } else if (base64Data.startsWith('iVBORw0KGgo')) {
+                        detectedType = 'image/png';
+                      } else if (base64Data.startsWith('R0lGODlh')) {
+                        detectedType = 'image/gif';
+                      } else if (base64Data.startsWith('UklGR')) {
+                        detectedType = 'image/webp';
+                      }
+                      
+                      finalSrc = `data:${detectedType};base64,${base64Data}`;
+                    }
+                    
+                    console.log(`📸 Inserting missing image ${index + 1}...`);
+                    
+                    // Insert the image
+                    editor.commands.focus('end');
+                    editor.commands.insertContent('<p></p>');
+                    editor.commands.setImage({ 
+                      src: finalSrc, 
+                      alt: `Imported image ${index + 1}` 
+                    });
+                  }
+                });
+              }
+            }
           }
           
-        } catch (error) {
-          console.error("❌ Error setting content:", error);
-        }
-        
-        // Display conversion warnings if any
-        if (result.messages && result.messages.length > 0) {
-          console.warn("Conversion warnings:", result.messages);
-          toast.warning("Document converted with some formatting limitations");
-        }
+          // Log final DOM state
+          if (domImages.length > 0) {
+            console.log("🖼️ Final images in DOM:", domImages.length);
+            domImages.forEach((img: HTMLImageElement, index: number) => {
+              console.log(`📸 Image ${index + 1}:`, {
+                src: img.src.substring(0, 50) + "...",
+                alt: img.alt,
+                complete: img.complete,
+                naturalWidth: img.naturalWidth,
+                naturalHeight: img.naturalHeight
+              });
+            });
+          } else {
+            console.log("❌ No images found in final DOM");
+          }
+        }, 1000);
         
         // Success message
         toast.dismiss();
-        toast.success("Document opened successfully");
+        toast.success("Document imported successfully!");
       }
-    } catch (error) {
-      console.error("Error opening document:", error);
+    } catch (error: unknown) {
+      console.error("❌ Error during document upload:", error);
       toast.dismiss();
-      toast.error("Failed to open document");
+      toast.error(`Failed to import document: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
   
   // Trigger file selection
   input.click();
+};
+
+// Helper function to process and clean up the docx-preview HTML
+const processDocxHtml = async (html: string, file: File): Promise<string> => {
+  console.log("🔧 Processing HTML for TipTap compatibility...");
+  
+  let processedHtml = html;
+  
+  // Remove docx-preview specific wrapper classes but keep content
+  processedHtml = processedHtml.replace(/<div class="docx-preview-container"[^>]*>/gi, '<div class="word-document-import">');
+  
+  // Fix image sources - docx-preview uses base64 data URLs which should work
+  const imageCount = (processedHtml.match(/<img/g) || []).length;
+  console.log("📸 Found", imageCount, "images to process");
+  
+  // Process images to ensure they work with TipTap
+  processedHtml = processedHtml.replace(/<img([^>]*?)>/gi, (match, attributes) => {
+    console.log("🖼️ Processing image:", match.substring(0, 100) + "...");
+    
+    // Extract src and other attributes
+    const srcMatch = attributes.match(/src="([^"]+)"/);
+    const altMatch = attributes.match(/alt="([^"]*)"/);
+    const styleMatch = attributes.match(/style="([^"]*)"/);
+    
+    if (srcMatch && srcMatch[1]) {
+      const src = srcMatch[1];
+      const alt = altMatch ? altMatch[1] : "Imported image";
+      const existingStyle = styleMatch ? styleMatch[1] : "";
+      
+      console.log("🖼️ Image src length:", src.length);
+      console.log("🖼️ Image src starts with:", src.substring(0, 50));
+      
+      // Check if it's a base64 data URL (including octet-stream which docx-preview uses)
+      if (src.startsWith('data:') && src.includes('base64,')) {
+        let finalSrc = src;
+        
+        // Fix MIME type if it's octet-stream but contains image data
+        if (src.startsWith('data:application/octet-stream;base64,')) {
+          const base64Data = src.replace('data:application/octet-stream;base64,', '');
+          
+          // Try to detect image type from base64 data
+          let detectedType = 'image/jpeg'; // default
+          
+          // Check for common image signatures in base64
+          if (base64Data.startsWith('/9j/')) {
+            detectedType = 'image/jpeg';
+          } else if (base64Data.startsWith('iVBORw0KGgo')) {
+            detectedType = 'image/png';
+          } else if (base64Data.startsWith('R0lGODlh')) {
+            detectedType = 'image/gif';
+          } else if (base64Data.startsWith('UklGR')) {
+            detectedType = 'image/webp';
+          }
+          
+          finalSrc = `data:${detectedType};base64,${base64Data}`;
+          console.log("🔧 Fixed MIME type:", detectedType);
+        }
+        
+        console.log("✅ Valid data URL found (final):", finalSrc.substring(0, 50));
+        
+        // Create a clean, TipTap-compatible image tag
+        return `<img src="${finalSrc}" alt="${alt}" class="imported-image docx-image" style="max-width: 100%; height: auto; display: block; margin: 1rem 0;" />`;
+      } else {
+        console.log("❌ Invalid image src:", src.substring(0, 100));
+        return ''; // Remove invalid images
+      }
+    }
+    
+    console.log("❌ No valid src found in image tag");
+    return ''; // Remove malformed image tags
+  });
+  
+  // Enhanced table processing
+  processedHtml = processedHtml.replace(/<table([^>]*?)>/gi, (match, attributes) => {
+    console.log("📋 Processing table:", match.substring(0, 100) + "...");
+    
+    const styleMatch = attributes.match(/style="([^"]*)"/);
+    const existingStyle = styleMatch ? styleMatch[1] : "";
+    
+    const enhancedStyle = `border-collapse: collapse; width: 100%; margin: 1rem 0; border: 1px solid #ddd; font-size: 14px; ${existingStyle}`;
+    
+    return `<table class="word-table docx-table" style="${enhancedStyle}">`;
+  });
+  
+  // Enhanced table cell processing
+  processedHtml = processedHtml.replace(/<td([^>]*?)>/gi, (match, attributes) => {
+    const styleMatch = attributes.match(/style="([^"]*)"/);
+    const existingStyle = styleMatch ? styleMatch[1] : "";
+    
+    const enhancedStyle = `border: 1px solid #ddd; padding: 8px; vertical-align: top; ${existingStyle}`;
+    
+    return `<td style="${enhancedStyle}">`;
+  });
+  
+  processedHtml = processedHtml.replace(/<th([^>]*?)>/gi, (match, attributes) => {
+    const styleMatch = attributes.match(/style="([^"]*)"/);
+    const existingStyle = styleMatch ? styleMatch[1] : "";
+    
+    const enhancedStyle = `border: 1px solid #ddd; padding: 8px; font-weight: bold; background-color: #f8f9fa; text-align: left; ${existingStyle}`;
+    
+    return `<th style="${enhancedStyle}">`;
+  });
+  
+  // Enhanced heading processing
+  for (let i = 1; i <= 6; i++) {
+    const headingRegex = new RegExp(`<h${i}([^>]*?)>`, 'gi');
+    processedHtml = processedHtml.replace(headingRegex, (match, attributes) => {
+      const styleMatch = attributes.match(/style="([^"]*)"/);
+      const existingStyle = styleMatch ? styleMatch[1] : "";
+      
+      const fontSize = i === 1 ? '2em' : i === 2 ? '1.5em' : i === 3 ? '1.17em' : '1em';
+      const margin = i <= 3 ? '1.5em 0 0.5em 0' : '1em 0 0.5em 0';
+      
+      const enhancedStyle = `font-size: ${fontSize}; font-weight: bold; margin: ${margin}; color: #2d3748; ${existingStyle}`;
+      
+      return `<h${i} style="${enhancedStyle}">`;
+    });
+  }
+  
+  // Enhanced paragraph processing
+  processedHtml = processedHtml.replace(/<p([^>]*?)>/gi, (match, attributes) => {
+    const styleMatch = attributes.match(/style="([^"]*)"/);
+    const existingStyle = styleMatch ? styleMatch[1] : "";
+    
+    let enhancedStyle = `margin-bottom: 1em; line-height: 1.6; ${existingStyle}`;
+    
+    // Check for text alignment in existing styles
+    if (existingStyle.includes('text-align: center')) {
+      enhancedStyle = `text-align: center; margin-bottom: 1em; line-height: 1.6; ${existingStyle}`;
+    } else if (existingStyle.includes('text-align: right')) {
+      enhancedStyle = `text-align: right; margin-bottom: 1em; line-height: 1.6; ${existingStyle}`;
+    }
+    
+    return `<p style="${enhancedStyle}">`;
+  });
+  
+  // Enhanced list processing
+  processedHtml = processedHtml.replace(/<ul([^>]*?)>/gi, (match, attributes) => {
+    const styleMatch = attributes.match(/style="([^"]*)"/);
+    const existingStyle = styleMatch ? styleMatch[1] : "";
+    
+    const enhancedStyle = `margin: 1em 0; padding-left: 2em; list-style-type: disc; ${existingStyle}`;
+    
+    return `<ul style="${enhancedStyle}">`;
+  });
+  
+  processedHtml = processedHtml.replace(/<ol([^>]*?)>/gi, (match, attributes) => {
+    const styleMatch = attributes.match(/style="([^"]*)"/);
+    const existingStyle = styleMatch ? styleMatch[1] : "";
+    
+    const enhancedStyle = `margin: 1em 0; padding-left: 2em; list-style-type: decimal; ${existingStyle}`;
+    
+    return `<ol style="${enhancedStyle}">`;
+  });
+  
+  processedHtml = processedHtml.replace(/<li([^>]*?)>/gi, (match, attributes) => {
+    const styleMatch = attributes.match(/style="([^"]*)"/);
+    const existingStyle = styleMatch ? styleMatch[1] : "";
+    
+    const enhancedStyle = `margin-bottom: 0.5em; line-height: 1.5; ${existingStyle}`;
+    
+    return `<li style="${enhancedStyle}">`;
+  });
+  
+  // Enhanced text formatting
+  processedHtml = processedHtml.replace(/<strong([^>]*?)>/gi, (match, attributes) => {
+    const styleMatch = attributes.match(/style="([^"]*)"/);
+    const existingStyle = styleMatch ? styleMatch[1] : "";
+    
+    const enhancedStyle = `font-weight: bold; ${existingStyle}`;
+    
+    return `<strong style="${enhancedStyle}">`;
+  });
+  
+  processedHtml = processedHtml.replace(/<em([^>]*?)>/gi, (match, attributes) => {
+    const styleMatch = attributes.match(/style="([^"]*)"/);
+    const existingStyle = styleMatch ? styleMatch[1] : "";
+    
+    const enhancedStyle = `font-style: italic; ${existingStyle}`;
+    
+    return `<em style="${enhancedStyle}">`;
+  });
+  
+  processedHtml = processedHtml.replace(/<u([^>]*?)>/gi, (match, attributes) => {
+    const styleMatch = attributes.match(/style="([^"]*)"/);
+    const existingStyle = styleMatch ? styleMatch[1] : "";
+    
+    const enhancedStyle = `text-decoration: underline; ${existingStyle}`;
+    
+    return `<u style="${enhancedStyle}">`;
+  });
+  
+  // Clean up any remaining docx-preview specific elements
+  processedHtml = processedHtml.replace(/class="[^"]*docx-preview[^"]*"/gi, '');
+  
+  // Add comprehensive wrapper styling
+  const wrapperStyle = `
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+    line-height: 1.6; 
+    color: #2d3748; 
+    max-width: 100%; 
+    overflow-wrap: break-word;
+  `;
+  
+  processedHtml = `<div class="word-document-import docx-import" style="${wrapperStyle}">${processedHtml}</div>`;
+  
+  // Final counts
+  const finalImageCount = (processedHtml.match(/<img/g) || []).length;
+  const finalTableCount = (processedHtml.match(/<table/g) || []).length;
+  
+  console.log("✅ HTML processing complete:", {
+    images: finalImageCount,
+    tables: finalTableCount,
+    htmlLength: processedHtml.length
+  });
+  
+  return processedHtml;
 };
 
 
@@ -375,7 +623,7 @@ const handleWordDocumentUpload = async (editor: any) => {
                     <PrinterIcon className="mr-2 size-4" />
                     Print <MenubarShortcut>&#x2318; + P</MenubarShortcut>
                   </MenubarItem>
-               <MenubarItem onSelect={(e) => {
+               <MenubarItem onClick={(e) => {
   e.preventDefault();
   handleWordDocumentUpload(editor);
 }}>

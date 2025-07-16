@@ -2,6 +2,7 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import "@/styles/imported-document.css";
+import "@/app/word-document-styles.css";
 import StarterKit from "@tiptap/starter-kit";
 
 import TaskItem from "@tiptap/extension-task-item";
@@ -93,11 +94,9 @@ export const Editor = ({ initialContent }: EditorProps) => {
       TableCell,
       TableHeader,
       TableRow,
-      TaskList,
-      Image.configure({
+      TaskList,      Image.configure({
         allowBase64: true, // This is critical for Word document images
         inline: false,
-       
         HTMLAttributes: {
           class: 'imported-image',
           style: 'max-width: 100%; height: auto; display: block; margin: 1rem auto;',

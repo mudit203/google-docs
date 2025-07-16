@@ -1,0 +1,297 @@
+/* Word document import styling for both mammoth and docx-preview */
+.word-document-import,
+.docx-import {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  line-height: 1.6;
+  color: #2d3748;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+/* Image styling for both libraries */
+.word-document-import img,
+.docx-import img,
+.imported-image,
+.docx-image {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  margin: 1rem 0 !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Table styling for both libraries */
+.word-document-import table,
+.docx-import table,
+.word-table,
+.docx-table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 1rem 0 !important;
+  border: 1px solid #ddd !important;
+  font-size: 14px;
+  background: white;
+}
+
+.word-document-import td, 
+.word-document-import th,
+.docx-import td,
+.docx-import th {
+  border: 1px solid #ddd !important;
+  padding: 8px !important;
+  text-align: left;
+  vertical-align: top;
+}
+
+.word-document-import th,
+.docx-import th {
+  background-color: #f8f9fa !important;
+  font-weight: bold !important;
+}
+
+/* Heading styling for both libraries */
+.word-document-import h1,
+.docx-import h1 {
+  font-size: 2em !important;
+  margin: 1.5em 0 0.5em 0 !important;
+  font-weight: bold !important;
+  color: #2d3748 !important;
+}
+
+.word-document-import h2,
+.docx-import h2 {
+  font-size: 1.5em !important;
+  margin: 1.3em 0 0.5em 0 !important;
+  font-weight: bold !important;
+  color: #2d3748 !important;
+}
+
+.word-document-import h3,
+.docx-import h3 {
+  font-size: 1.17em !important;
+  margin: 1.17em 0 0.5em 0 !important;
+  font-weight: bold !important;
+  color: #2d3748 !important;
+}
+
+.word-document-import h4,
+.docx-import h4 {
+  font-size: 1em !important;
+  margin: 1em 0 0.5em 0 !important;
+  font-weight: bold !important;
+  color: #2d3748 !important;
+}
+
+.word-document-import h5,
+.docx-import h5 {
+  font-size: 0.83em !important;
+  margin: 1em 0 0.5em 0 !important;
+  font-weight: bold !important;
+  color: #2d3748 !important;
+}
+
+.word-document-import h6,
+.docx-import h6 {
+  font-size: 0.67em !important;
+  margin: 1em 0 0.5em 0 !important;
+  font-weight: bold !important;
+  color: #2d3748 !important;
+}
+
+/* Paragraph styling */
+.word-document-import p,
+.docx-import p {
+  margin-bottom: 1em !important;
+  line-height: 1.6 !important;
+}
+
+/* List styling */
+.word-document-import ul,
+.word-document-import ol,
+.docx-import ul,
+.docx-import ol {
+  margin: 1em 0 !important;
+  padding-left: 2em !important;
+}
+
+.word-document-import ul,
+.docx-import ul {
+  list-style-type: disc !important;
+}
+
+.word-document-import ol,
+.docx-import ol {
+  list-style-type: decimal !important;
+}
+
+.word-document-import li,
+.docx-import li {
+  margin-bottom: 0.5em !important;
+  line-height: 1.5 !important;
+}
+
+/* Text formatting */
+.word-document-import strong,
+.docx-import strong {
+  font-weight: bold !important;
+}
+
+.word-document-import em,
+.docx-import em {
+  font-style: italic !important;
+}
+
+.word-document-import u,
+.docx-import u {
+  text-decoration: underline !important;
+}
+
+/* Text alignment utilities */
+.text-center {
+  text-align: center !important;
+}
+
+.text-right {
+  text-align: right !important;
+}
+
+.text-left {
+  text-align: left !important;
+}
+
+/* Enhanced TipTap editor styling for imported content */
+.ProseMirror img {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  margin: 1rem 0 !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.ProseMirror .imported-image,
+.ProseMirror .docx-image {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  margin: 1rem 0 !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.ProseMirror table {
+  border-collapse: collapse !important;
+  margin: 1rem 0 !important;
+  width: 100% !important;
+  border: 1px solid #ddd !important;
+  background: white;
+}
+
+.ProseMirror .word-table,
+.ProseMirror .docx-table {
+  border-collapse: collapse !important;
+  margin: 1rem 0 !important;
+  width: 100% !important;
+  border: 1px solid #ddd !important;
+  background: white;
+}
+
+.ProseMirror td, 
+.ProseMirror th {
+  border: 1px solid #ddd !important;
+  padding: 8px !important;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ProseMirror th {
+  background-color: #f8f9fa !important;
+  font-weight: bold !important;
+}
+
+/* Ensure headings maintain proper styling in editor */
+.ProseMirror h1 {
+  font-size: 2em !important;
+  font-weight: bold !important;
+  margin: 1.5em 0 0.5em 0 !important;
+  color: #2d3748 !important;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5em !important;
+  font-weight: bold !important;
+  margin: 1.3em 0 0.5em 0 !important;
+  color: #2d3748 !important;
+}
+
+.ProseMirror h3 {
+  font-size: 1.17em !important;
+  font-weight: bold !important;
+  margin: 1.17em 0 0.5em 0 !important;
+  color: #2d3748 !important;
+}
+
+.ProseMirror h4 {
+  font-size: 1em !important;
+  font-weight: bold !important;
+  margin: 1em 0 0.5em 0 !important;
+  color: #2d3748 !important;
+}
+
+.ProseMirror strong {
+  font-weight: bold !important;
+}
+
+.ProseMirror em {
+  font-style: italic !important;
+}
+
+.ProseMirror u {
+  text-decoration: underline !important;
+}
+
+/* Force image display for data URLs */
+.ProseMirror img[src^="data:"] {
+  display: block !important;
+  max-width: 100% !important;
+  height: auto !important;
+  margin: 1rem 0 !important;
+  border: 1px solid #e2e8f0 !important;
+  background: white !important;
+}
+
+/* Docx-preview specific styling */
+.docx-preview-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  color: #2d3748;
+}
+
+/* Page break styling */
+.docx-page-break {
+  page-break-before: always;
+  border-top: 2px dashed #ccc;
+  margin: 2rem 0;
+  padding-top: 2rem;
+}
+
+/* Ensure proper spacing and layout */
+.ProseMirror .word-document-import,
+.ProseMirror .docx-import {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Fix for nested elements */
+.ProseMirror .word-document-import > *:first-child,
+.ProseMirror .docx-import > *:first-child {
+  margin-top: 0;
+}
+
+.ProseMirror .word-document-import > *:last-child,
+.ProseMirror .docx-import > *:last-child {
+  margin-bottom: 0;
+}
