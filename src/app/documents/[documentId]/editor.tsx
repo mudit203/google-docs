@@ -1,6 +1,7 @@
 "use client";
 
 import { useEditor, EditorContent } from "@tiptap/react";
+import "@/styles/imported-document.css";
 import StarterKit from "@tiptap/starter-kit";
 
 import TaskItem from "@tiptap/extension-task-item";
@@ -31,6 +32,7 @@ import { useStorage } from "@liveblocks/react";
 import { useEditorStore } from "@/store/use-editor-store";
 import { FontSizeExtensions } from "@/extensions/font-size";
 import { LineHeightExtension } from "@/extensions/line-height";
+import { PageBreak } from "@/extensions/page-break";
 import { Ruler } from "./ruler";
 import { Threads } from "./threads";
 import { LEFT_MARGIN_DEFAULT, RIGHT_MARGIN_DEFAULT } from "@/constants/margins";
@@ -92,7 +94,15 @@ export const Editor = ({ initialContent }: EditorProps) => {
       TableHeader,
       TableRow,
       TaskList,
-      Image,
+      Image.configure({
+        allowBase64: true, // This is critical for Word document images
+        inline: false,
+       
+        HTMLAttributes: {
+          class: 'imported-image',
+          style: 'max-width: 100%; height: auto; display: block; margin: 1rem auto;',
+        },
+      }),
       ImageResize,
       Underline,
       FontFamily,
@@ -115,6 +125,7 @@ export const Editor = ({ initialContent }: EditorProps) => {
         multicolor: true,
       }),
       TaskItem.configure({ nested: true }),
+      PageBreak,
     ],
   });
 

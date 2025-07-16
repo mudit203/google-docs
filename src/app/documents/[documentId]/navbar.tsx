@@ -76,6 +76,201 @@ export const Navbar = ({ data }: NavbarProps) => {
     editor?.chain().focus().insertTable({ rows, cols, withHeaderRow: false }).run();
   };
 
+const handleWordDocumentUpload = async (editor: any) => {
+  // Create a hidden file input
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".docx,.doc";
+  
+  // Handle file selection
+  input.onchange = async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    
+    try {
+      // Import mammoth dynamically
+      const mammoth = await import("mammoth");
+      
+      // Show loading toast
+      toast.loading("Converting document...");
+      
+      // Enhanced conversion options with better styling and page break handling
+      const options = {
+        convertImage: mammoth.images.imgElement((image: any) => {
+          return image.read("base64").then((imageBuffer: string) => {
+            const imgSrc = `data:${image.contentType};base64,${imageBuffer}`;
+            console.log("📸 Image converted:", {
+              contentType: image.contentType,
+              dataLength: imageBuffer.length,
+              srcPreview: imgSrc.substring(0, 50) + "..."
+            });
+            return {
+              src: imgSrc,
+              alt: "Imported image from Word document",
+              style: "max-width: 100%; height: auto; display: block; margin: 1rem 0",
+              width: "auto",
+              height: "auto"
+            };
+          }).catch((error: Error) => {
+            console.error("❌ Image conversion error:", error);
+            return {
+              src: "",
+              alt: "Failed to convert image"
+            };
+          });
+        }),
+        
+        // Style mapping to preserve Word document formatting
+        styleMap: [
+          // Headings
+          "p[style-name='Heading 1'] => h1",
+          "p[style-name='Heading 2'] => h2", 
+          "p[style-name='Heading 3'] => h3",
+          "p[style-name='Heading 4'] => h4",
+          "p[style-name='Heading 5'] => h5",
+          "p[style-name='Heading 6'] => h6",
+          
+          // Text formatting
+          "r[style-name='Strong'] => strong",
+          "r[style-name='Emphasis'] => em",
+          
+          // Lists
+          "p[style-name='List Paragraph'] => li:fresh",
+          
+          // Tables - preserve table structure
+          "table => table.imported-table",
+          "tr => tr",
+          "td => td",
+          
+          // Page breaks - convert to horizontal rules for visual separation
+          "p[style-name='Page Break'] => hr",
+          
+          // Default paragraph styling
+          "p => p:fresh"
+        ],
+        
+        // Handle page breaks through style mapping instead
+        includeDefaultStyleMap: true
+      };
+      
+      const result = await mammoth.convertToHtml(
+        { arrayBuffer: await file.arrayBuffer() },
+        options
+      );
+      
+      if (editor) {
+        // Clear current content
+        editor.commands.clearContent();
+        
+        // Process the HTML to add page breaks and improve formatting
+        let processedHtml = result.value;
+        
+        console.log("📝 Raw HTML from mammoth:", processedHtml.substring(0, 500) + "...");
+        
+        // Add page break styling
+           processedHtml = processedHtml.replace(
+          /<img([^>]*)>/gi,
+          (match, attrs) => {
+            console.log("🖼️ Found image tag:", match);
+            return `<img${attrs} class="imported-image" style="max-width: 100%; height: auto; display: block; margin: 1rem auto;">`;
+          }
+        );
+        // Ensure images have proper attributes for TipTap
+        processedHtml = processedHtml.replace(
+          /<img([^>]*)>/gi,
+          (match, attrs) => {
+            console.log("🖼️ Found image tag:", match);
+            return `<img${attrs} class="imported-image" style="max-width: 100%; height: auto; display: block; margin: 1rem auto;">`;
+          }
+        );
+        
+        // Improve table styling
+        processedHtml = processedHtml.replace(
+          /<table/gi,
+          '<table style="border-collapse: collapse; width: 100%; margin: 1rem 0; border: 1px solid #ddd;"'
+        );
+        
+        processedHtml = processedHtml.replace(
+          /<td/gi,
+          '<td style="border: 1px solid #ddd; padding: 0.5rem;"'
+        );
+        
+        console.log("✅ Processed HTML preview:", processedHtml.substring(0, 500) + "...");
+        
+        // Set new content from Word document
+        console.log("🔄 Setting content in editor...");
+        
+        try {
+          // Extract images from HTML for separate insertion
+          const images: Array<{src: string, alt: string}> = [];
+          const imageRegex = /<img[^>]+src="([^"]*)"[^>]*alt="([^"]*)"[^>]*>/gi;
+          let match;
+          
+          while ((match = imageRegex.exec(processedHtml)) !== null) {
+            images.push({
+              src: match[1],
+              alt: match[2]
+            });
+          }
+          
+          console.log("🖼️ Extracted images:", images.length);
+          
+          // Remove images from HTML temporarily
+          const htmlWithoutImages = processedHtml.replace(/<img[^>]*>/gi, '<p>[IMAGE_PLACEHOLDER]</p>');
+          
+          // Set content without images first
+          editor.commands.setContent(htmlWithoutImages);
+          console.log("✅ Text content set successfully");
+          
+          // Insert images one by one
+          if (images.length > 0) {
+            setTimeout(() => {
+              images.forEach((image, index) => {
+                console.log(`📸 Inserting image ${index + 1}:`, image.src.substring(0, 50) + "...");
+                
+                // Find placeholder and replace with image
+                const content = editor.getHTML();
+                const updatedContent = content.replace('<p>[IMAGE_PLACEHOLDER]</p>', 
+                  `<img src="${image.src}" alt="${image.alt}" class="imported-image" style="max-width: 100%; height: auto; display: block; margin: 1rem auto;" />`
+                );
+                editor.commands.setContent(updatedContent);
+              });
+              
+              // Final check
+              setTimeout(() => {
+                const editorImages = editor.view.dom.querySelectorAll('img');
+                console.log("🖼️ Final images in editor:", editorImages.length);
+              }, 500);
+              
+            }, 500);
+          }
+          
+        } catch (error) {
+          console.error("❌ Error setting content:", error);
+        }
+        
+        // Display conversion warnings if any
+        if (result.messages && result.messages.length > 0) {
+          console.warn("Conversion warnings:", result.messages);
+          toast.warning("Document converted with some formatting limitations");
+        }
+        
+        // Success message
+        toast.dismiss();
+        toast.success("Document opened successfully");
+      }
+    } catch (error) {
+      console.error("Error opening document:", error);
+      toast.dismiss();
+      toast.error("Failed to open document");
+    }
+  };
+  
+  // Trigger file selection
+  input.click();
+};
+
+
   const onDownload = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -180,6 +375,13 @@ export const Navbar = ({ data }: NavbarProps) => {
                     <PrinterIcon className="mr-2 size-4" />
                     Print <MenubarShortcut>&#x2318; + P</MenubarShortcut>
                   </MenubarItem>
+               <MenubarItem onSelect={(e) => {
+  e.preventDefault();
+  handleWordDocumentUpload(editor);
+}}>
+  <FileIcon className="mr-2 size-4" />
+  Open Word Document <MenubarShortcut>&#x2318; + O</MenubarShortcut>
+</MenubarItem>
                 </MenubarContent>
               </MenubarMenu>
               <MenubarMenu>

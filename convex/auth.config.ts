@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: "https://current-raven-81.clerk.accounts.dev",
+      domain: "https://live-pangolin-11.clerk.accounts.dev",
       applicationID: "convex"
     }
   ]
